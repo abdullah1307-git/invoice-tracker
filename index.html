@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chaser: unpaid invoice tracker for freelancers</title>
+<meta name="description" content="Track unpaid invoices across clients. Status updates itself from due dates, so it never goes stale.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700;800&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#E9EDF2; --panel:#F8FAFC; --ink:#18212F; --muted:#5B677A; --line:#CFD7E2;
+  --blue:#2B44E8; --late:#C23B2E; --soon:#A9650C; --ok:#1E7A55;
+  --late-bg:#F7DDD9; --soon-bg:#F5E6CC; --ok-bg:#D6EBDF; --open-bg:#DDE3EE;
+  --display:"Bricolage Grotesque","Trebuchet MS",sans-serif;
+  --body:"Instrument Sans","Segoe UI",Arial,sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#0F1520;--panel:#171F2E;--ink:#E7ECF4;--muted:#93A0B5;--line:#2A3548;--blue:#7F92FF;
+  --late:#FF8A7D;--soon:#E8B05A;--ok:#6CCBA0;--late-bg:#3A1F1D;--soon-bg:#372B14;--ok-bg:#16301F;--open-bg:#222C40}
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.5 var(--body)}
+.wrap{max-width:1120px;margin:0 auto;padding:28px 20px 60px}
+h1,h2,h3{font-family:var(--display);margin:0;line-height:1.1}
+header{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:16px;margin-bottom:26px}
+h1{font-size:clamp(2rem,5vw,3.2rem);font-weight:800;letter-spacing:-.02em}
+header p{margin:6px 0 0;color:var(--muted);max-width:46ch}
+.tools{display:flex;gap:8px;flex-wrap:wrap}
+button,select,input{font:inherit;color:inherit}
+button{cursor:pointer;border:1px solid var(--line);background:var(--panel);padding:7px 12px;border-radius:8px}
+button:hover{border-color:var(--blue)}
+button.primary{background:var(--blue);color:#fff;border-color:var(--blue);font-weight:600}
+@media (prefers-color-scheme:dark){button.primary{color:#0F1520}}
+:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px}
+.totals{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:14px}
+.totals .panel{padding:16px 18px}
+.totals small{color:var(--muted);display:block}
+.totals b{font:800 1.9rem var(--display);letter-spacing:-.01em}
+.totals .late b{color:var(--late)}
+.aging{margin-bottom:22px}
+.aging h2{font-size:1.1rem;margin-bottom:12px}
+.bar{display:flex;height:34px;border-radius:8px;overflow:hidden;background:var(--open-bg)}
+.bar span{min-width:0;transition:flex-grow .4s}
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:10px;font-size:.9rem;color:var(--muted)}
+.legend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.cols{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:20px;align-items:start}
+@media (max-width:900px){.cols{grid-template-columns:1fr}}
+.listhead{display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:center;margin-bottom:14px}
+.filters{display:flex;gap:6px;flex-wrap:wrap}
+.filters button[aria-pressed=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:560px}
+th{text-align:left;font-weight:500;color:var(--muted);font-size:.85rem;padding:0 8px 8px;border-bottom:1px solid var(--line)}
+td{padding:12px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+td.amt,th.amt{text-align:right;font-variant-numeric:tabular-nums}
+.client{font-weight:600}.sub{color:var(--muted);font-size:.85rem}
+.badge{display:inline-block;padding:2px 9px;border-radius:99px;font-size:.82rem;font-weight:600;white-space:nowrap}
+.b-late{background:var(--late-bg);color:var(--late)}
+.b-soon{background:var(--soon-bg);color:var(--soon)}
+.b-open{background:var(--open-bg);color:var(--muted)}
+.b-paid{background:var(--ok-bg);color:var(--ok)}
+.acts{display:flex;gap:4px;justify-content:flex-end}
+.acts button{padding:4px 8px;font-size:.85rem}
+.empty{padding:34px 10px;text-align:center;color:var(--muted)}
+form{display:grid;gap:12px}
+label{display:grid;gap:4px;font-size:.88rem;color:var(--muted)}
+input,select{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.clients{margin-top:20px}
+.clients h2{font-size:1.1rem;margin-bottom:10px}
+.clients li{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);list-style:none}
+.clients ul{margin:0;padding:0}
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;opacity:0;pointer-events:none;transition:opacity .2s}
+.toast.show{opacity:1}
+footer{margin-top:30px;color:var(--muted);font-size:.85rem}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Chaser</h1>
+      <p>Every unpaid invoice, by client. Status is worked out from due dates each time you open the page, so nothing goes out of date.</p>
+    </div>
+    <div class="tools">
+      <select id="cur" aria-label="Currency"></select>
+      <button id="csv">Export CSV</button>
+      <button id="sample">Load sample data</button>
+      <button id="clear">Clear all</button>
+    </div>
+  </header>
+
+  <section class="totals" aria-label="Totals">
+    <div class="panel"><small>Outstanding</small><b id="t-out">0</b></div>
+    <div class="panel late"><small>Overdue</small><b id="t-late">0</b></div>
+    <div class="panel"><small>Due in the next 7 days</small><b id="t-soon">0</b></div>
+    <div class="panel"><small>Paid in the last 30 days</small><b id="t-paid">0</b></div>
+  </section>
+
+  <section class="panel aging" aria-label="How late the money is">
+    <h2>How late is the money?</h2>
+    <div class="bar" id="bar" role="img" aria-label="Outstanding amount by lateness"></div>
+    <div class="legend" id="legend"></div>
+  </section>
+
+  <div class="cols">
+    <section class="panel">
+      <div class="listhead">
+        <h2>Invoices</h2>
+        <div class="filters" id="filters">
+          <button data-f="unpaid" aria-pressed="true">Unpaid</button>
+          <button data-f="overdue" aria-pressed="false">Overdue</button>
+          <button data-f="paid" aria-pressed="false">Paid</button>
+          <button data-f="all" aria-pressed="false">All</button>
+        </div>
+      </div>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Client</th><th class="amt">Amount</th><th>Due</th><th>Status</th><th></th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <div class="empty" id="empty" hidden>Nothing here yet. Add an invoice to start tracking.</div>
+    </section>
+
+    <aside>
+      <div class="panel">
+        <h2 style="margin-bottom:14px;font-size:1.1rem">Add invoice</h2>
+        <form id="form">
+          <label>Client<input id="f-client" list="clientlist" required placeholder="Northwind Studio"><datalist id="clientlist"></datalist></label>
+          <div class="row">
+            <label>Invoice no.<input id="f-num" required placeholder="INV-024"></label>
+            <label>Amount<input id="f-amt" type="number" min="0" step="0.01" required placeholder="850"></label>
+          </div>
+          <div class="row">
+            <label>Issued<input id="f-issued" type="date" required></label>
+            <label>Terms (days)<input id="f-terms" type="number" min="0" value="30" required></label>
+          </div>
+          <button class="primary" type="submit">Add invoice</button>
+        </form>
+      </div>
+      <div class="panel clients">
+        <h2>Owed by client</h2>
+        <ul id="clients"></ul>
+      </div>
+    </aside>
+  </div>
+  <footer>Data stays in this browser (local storage). Use Export CSV to keep a backup.</footer>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+const KEY="chaser.v1", CKEY="chaser.cur";
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let invoices=[], filter="unpaid", currency="USD";
+
+function load(){
+  try{invoices=JSON.parse(localStorage.getItem(KEY))||[]}catch(e){invoices=[]}
+  try{currency=localStorage.getItem(CKEY)||"USD"}catch(e){}
+}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(invoices))}catch(e){toast("Could not save in this browser")}}
+
+const iso=d=>{const z=new Date(d.getTime()-d.getTimezoneOffset()*6e4);return z.toISOString().slice(0,10)};
+const dayNum=s=>Math.floor(new Date(s+"T00:00:00Z").getTime()/864e5);
+const today=()=>dayNum(iso(new Date()));
+const addDays=(s,n)=>iso(new Date(new Date(s+"T12:00:00").getTime()+n*864e5));
+const money=n=>new Intl.NumberFormat(undefined,{style:"currency",currency,maximumFractionDigits:2}).format(n);
+const fmtDate=s=>new Date(s+"T12:00:00").toLocaleDateString(undefined,{day:"numeric",month:"short",year:"numeric"});
+
+function info(inv){
+  if(inv.paidOn) return {k:"paid",label:"Paid "+fmtDate(inv.paidOn),cls:"b-paid",late:0};
+  const late=today()-dayNum(inv.due);
+  if(late>0) return {k:"overdue",label:late+(late===1?" day late":" days late"),cls:"b-late",late};
+  if(late>=-7) return {k:"soon",label:late===0?"Due today":"Due in "+(-late)+(late===-1?" day":" days"),cls:"b-soon",late};
+  return {k:"open",label:"Due in "+(-late)+" days",cls:"b-open",late};
+}
+
+function render(){
+  const rows=invoices.map(i=>({i,s:info(i)}));
+  const unpaid=rows.filter(r=>!r.s.k.startsWith("paid"));
+  const sum=a=>a.reduce((t,r)=>t+r.i.amount,0);
+  $("#t-out").textContent=money(sum(unpaid));
+  $("#t-late").textContent=money(sum(unpaid.filter(r=>r.s.k==="overdue")));
+  $("#t-soon").textContent=money(sum(unpaid.filter(r=>r.s.k==="soon"||(r.s.late<=0&&r.s.late>=-7))));
+  $("#t-paid").textContent=money(sum(rows.filter(r=>r.i.paidOn&&today()-dayNum(r.i.paidOn)<=30)));
+
+  // aging bar
+  const b=[
+    {n:"Not due yet",c:"var(--open-bg)",t:0,f:r=>r.s.late<=0},
+    {n:"1 to 30 days late",c:"var(--soon)",t:0,f:r=>r.s.late>=1&&r.s.late<=30},
+    {n:"31 to 60 days late",c:"var(--late)",t:0,f:r=>r.s.late>=31&&r.s.late<=60},
+    {n:"Over 60 days late",c:"#7A1E16",t:0,f:r=>r.s.late>60}];
+  b.forEach(x=>x.t=sum(unpaid.filter(x.f)));
+  const total=b.reduce((t,x)=>t+x.t,0);
+  $("#bar").innerHTML=total?b.filter(x=>x.t).map(x=>`<span style="flex:${x.t} 1 0;background:${x.c}" title="${x.n}: ${money(x.t)}"></span>`).join(""):"";
+  $("#legend").innerHTML=b.map(x=>`<span><i style="background:${x.c};border:1px solid var(--line)"></i>${x.n}: ${money(x.t)}</span>`).join("");
+
+  // table
+  let list=rows;
+  if(filter==="unpaid") list=unpaid; else if(filter==="overdue") list=unpaid.filter(r=>r.s.k==="overdue"); else if(filter==="paid") list=rows.filter(r=>r.i.paidOn);
+  list=[...list].sort((a,b)=>filter==="paid"?b.i.paidOn.localeCompare(a.i.paidOn):a.i.due.localeCompare(b.i.due));
+  $("#rows").innerHTML=list.map(({i,s})=>`<tr>
+    <td><div class="client">${esc(i.client)}</div><div class="sub">${esc(i.num)}</div></td>
+    <td class="amt">${money(i.amount)}</td>
+    <td>${fmtDate(i.due)}</td>
+    <td><span class="badge ${s.cls}">${esc(s.label)}</span></td>
+    <td><div class="acts">${i.paidOn?`<button data-a="undo" data-id="${i.id}">Undo</button>`:`<button data-a="paid" data-id="${i.id}">Mark paid</button><button data-a="remind" data-id="${i.id}">Copy reminder</button>`}<button data-a="del" data-id="${i.id}" aria-label="Delete invoice ${esc(i.num)}">Delete</button></div></td>
+  </tr>`).join("");
+  $("#empty").hidden=list.length>0;
+
+  // clients
+  const by={};unpaid.forEach(r=>by[r.i.client]=(by[r.i.client]||0)+r.i.amount);
+  const names=Object.keys(by).sort((a,b)=>by[b]-by[a]);
+  $("#clients").innerHTML=names.length?names.map(n=>`<li><span>${esc(n)}</span><b>${money(by[n])}</b></li>`).join(""):`<li class="sub">No money owed right now.</li>`;
+  $("#clientlist").innerHTML=[...new Set(invoices.map(i=>i.client))].map(n=>`<option value="${esc(n)}">`).join("");
+}
+
+function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("show");clearTimeout(toast.h);toast.h=setTimeout(()=>t.classList.remove("show"),2200)}
+
+$("#form").addEventListener("submit",e=>{
+  e.preventDefault();
+  const issued=$("#f-issued").value, terms=parseInt($("#f-terms").value,10)||0;
+  invoices.push({id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),
+    client:$("#f-client").value.trim(),num:$("#f-num").value.trim(),
+    amount:parseFloat($("#f-amt").value),issued,due:addDays(issued,terms),paidOn:null});
+  save();e.target.reset();$("#f-issued").value=iso(new Date());$("#f-terms").value=terms;
+  render();toast("Invoice added");
+});
+
+$("#rows").addEventListener("click",e=>{
+  const btn=e.target.closest("button");if(!btn)return;
+  const inv=invoices.find(i=>i.id===btn.dataset.id);if(!inv)return;
+  const a=btn.dataset.a;
+  if(a==="paid"){inv.paidOn=iso(new Date());toast("Marked as paid")}
+  else if(a==="undo"){inv.paidOn=null}
+  else if(a==="del"){if(!confirm("Delete invoice "+inv.num+"?"))return;invoices=invoices.filter(i=>i!==inv)}
+  else if(a==="remind"){
+    const s=info(inv);
+    const when=s.late>0?"was due on "+fmtDate(inv.due)+" and is now "+s.late+(s.late===1?" day":" days")+" overdue":"is due on "+fmtDate(inv.due);
+    const msg=`Hi ${inv.client},\n\nA quick note that invoice ${inv.num} for ${money(inv.amount)} ${when}. Could you let me know when I can expect payment?\n\nThanks so much,`;
+    (navigator.clipboard?navigator.clipboard.writeText(msg):Promise.reject()).then(()=>toast("Reminder copied"),()=>{prompt("Copy this reminder:",msg)});
+    return;
+  }
+  save();render();
+});
+
+$("#filters").addEventListener("click",e=>{
+  const b=e.target.closest("button");if(!b)return;
+  filter=b.dataset.f;
+  document.querySelectorAll("#filters button").forEach(x=>x.setAttribute("aria-pressed",x===b));
+  render();
+});
+
+$("#cur").innerHTML=["USD","EUR","GBP","INR","AUD","CAD"].map(c=>`<option>${c}</option>`).join("");
+$("#cur").addEventListener("change",e=>{currency=e.target.value;try{localStorage.setItem(CKEY,currency)}catch(x){}render()});
+
+$("#csv").addEventListener("click",()=>{
+  if(!invoices.length){toast("Nothing to export yet");return}
+  const q=v=>'"'+String(v).replace(/"/g,'""')+'"';
+  const out=["Client,Invoice,Amount,Issued,Due,Paid on"].concat(invoices.map(i=>[q(i.client),q(i.num),i.amount,i.issued,i.due,i.paidOn||""].join(","))).join("\n");
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([out],{type:"text/csv"}));a.download="invoices-"+iso(new Date())+".csv";a.click();
+});
+
+$("#sample").addEventListener("click",()=>{
+  const t=iso(new Date()),mk=(c,n,amt,ago,terms,paid)=>({id:n+Math.random().toString(36).slice(2,6),client:c,num:n,amount:amt,issued:addDays(t,-ago),due:addDays(t,-ago+terms),paidOn:paid?addDays(t,-paid):null});
+  invoices=invoices.concat([
+    mk("Northwind Studio","INV-018",1200,95,30),mk("Northwind Studio","INV-022",640,20,30),
+    mk("Bloom Coffee Co.","INV-020",450,52,14),mk("Fable Books","INV-021",2400,38,30),
+    mk("Fable Books","INV-023",900,5,30),mk("Kite Labs","INV-019",780,70,30,6),mk("Kite Labs","INV-024",1500,2,45)]);
+  save();render();toast("Sample data loaded");
+});
+$("#clear").addEventListener("click",()=>{if(invoices.length&&confirm("Delete all invoices?")){invoices=[];save();render()}});
+
+load();$("#cur").value=currency;$("#f-issued").value=iso(new Date());render();
+setInterval(render,6e4*30);
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)render()});
+</script>
+</body>
+</html>
